@@ -24,7 +24,7 @@ public class HealthSystem : MonoBehaviour
     private MeshRenderer mesh;
     private void Awake() 
     { 
-        currentHealth = maxHealth; 
+        currentHealth = 50f; 
         isDead = false; 
 
         rb = GetComponent<Rigidbody>();
@@ -52,6 +52,17 @@ public class HealthSystem : MonoBehaviour
             Dead();
         }
     }
+
+    public void Heal(float amount)
+    {
+        if (isDead) return;
+
+        currentHealth += amount;
+        currentHealth = Mathf.Clamp(currentHealth, 0f, maxHealth);
+
+        Debug.Log($"[HealthSystem] Salud recuperada: +{amount}. Salud actual: {currentHealth}");
+    }
+
     private void Dead() 
     { 
         isDead = true;
