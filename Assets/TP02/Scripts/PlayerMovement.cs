@@ -46,7 +46,13 @@ public class PlayerMovement : MonoBehaviour
             
             if (Input.GetButtonDown("Jump") && isGrounded)
             {
+                rb.linearVelocity = new Vector3(
+                rb.linearVelocity.x, 
+                0f,
+                rb.linearVelocity.z
+                );
                 rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
+                isGrounded = false;
             }
 
     }
@@ -64,7 +70,7 @@ public class PlayerMovement : MonoBehaviour
     }
     private void CheckGround()
     {
-        Vector3 origin = transform.position;
+        Vector3 origin = transform.position + Vector3.down * 0.45f;
         isGrounded = Physics.Raycast(origin, Vector3.down, rayDistance, groundLayer);
 
         Color ColorRay = isGrounded ? Color.green : Color.red;
