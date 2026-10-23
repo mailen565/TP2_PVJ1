@@ -43,10 +43,10 @@ public class PlayerMovement : MonoBehaviour
             moveVertical = Input.GetAxis("Vertical");
 
             CheckGround();
-
+            
             if (Input.GetButtonDown("Jump") && isGrounded)
             {
-                rb.AddForce(new Vector3(0, jumpForce, 0));
+                rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
             }
 
     }
