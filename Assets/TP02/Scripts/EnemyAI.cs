@@ -21,19 +21,28 @@ public class EnemyAI : MonoBehaviour
 
     [Header("Attack Settings")]
     [SerializeField] private float attackCooldown = 1.5f;
-    private bool isAttacking=false;
+    private bool isAttacking = false;
+
+    [Header("Animación")]
+    [SerializeField] private string punchTriggerName = "Punch";
+    [SerializeField] private string speedFloatName = "Speed";
 
     private NavMeshAgent agent;
     private Transform playerTransform;
     private HealthSystem healthSystemPlayer;
+    private HealthSystem healthSystemSelf;
     private Attack attack;
+    private Animator animator;
     private bool isStunned;
 
     private void Awake()
     {
         agent = GetComponent<NavMeshAgent>();
         attack = GetComponent<Attack>();
+        healthSystemSelf = GetComponent<HealthSystem>();
         
+        // Busca el Animator en este objeto o en los hijos visuales del modelo 3D
+        animator = GetComponentInChildren<Animator>();
     }
 
     private void Start()
@@ -46,10 +55,10 @@ public class EnemyAI : MonoBehaviour
         }
         else
         {
-            Debug.LogError(" No  hay GameObjects con  tag Player");
+            Debug.LogError("[EnemyAI] No hay GameObjects con tag 'Player'");
         }
 
-        if (patrolPoints.Length > 0)
+        if (patrolPoints != null && patrolPoints.Length > 0)
         {
             GoToNextPatrolPoint();
         }
@@ -57,9 +66,18 @@ public class EnemyAI : MonoBehaviour
 
     private void Update()
     {
+        // 1. Si el enemigo murió, se frena de inmediato
+        if (healthSystemSelf != null && healthSystemSelf.IsDead)
+        {
+            if (agent != null && agent.isOnNavMesh) agent.isStopped = true;
+            return;
+        }
+
+        // 2. Si está aturdido, no hay jugador o el jugador murió, se detiene
         if (isStunned || playerTransform == null || (healthSystemPlayer != null && healthSystemPlayer.IsDead))
         {
-            agent.isStopped = true;
+            if (agent != null && agent.isOnNavMesh) agent.isStopped = true;
+            UpdateAnimationSpeed(0f);
             return;
         }
 
@@ -79,19 +97,25 @@ public class EnemyAI : MonoBehaviour
                 UpdateAttackState(distanceToPlayer);
                 break;
         }
+
+        // Actualiza el parámetro de caminado del Animator según el movimiento real
+        if (agent != null && agent.isOnNavMesh)
+        {
+            UpdateAnimationSpeed(agent.velocity.magnitude);
+        }
     }
 
     private void UpdatePatrolState(float distanceToPlayer)
     {
-        agent.isStopped = false;
+        if (agent != null && agent.isOnNavMesh) agent.isStopped = false;
 
         if (distanceToPlayer <= detectionRadius)
         {
             currentState = AIState.Chase;
             return;
         }
-        
-        if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance)
+
+        if (agent != null && !agent.pathPending && agent.remainingDistance <= agent.stoppingDistance)
         {
             if (!isWaitingAtPoint)
             {
@@ -102,17 +126,20 @@ public class EnemyAI : MonoBehaviour
 
     private void UpdateChaseState(float distanceToPlayer)
     {
-        agent.isStopped = false;
-        agent.SetDestination(playerTransform.position);
+        if (agent != null && agent.isOnNavMesh)
+        {
+            agent.isStopped = false;
+            agent.SetDestination(playerTransform.position);
+        }
 
-        // Transicion  Ataque
+        // Transición Ataque
         if (distanceToPlayer <= attackRadius)
         {
             currentState = AIState.Attack;
             return;
         }
 
-        // Si el jugador se escapa del radio de deteccion, vuelve a patrullar
+        // Si el jugador se escapa del radio de detección, vuelve a patrullar
         if (distanceToPlayer > detectionRadius * 1.2f)
         {
             currentState = AIState.Patrol;
@@ -122,40 +149,53 @@ public class EnemyAI : MonoBehaviour
 
     private void UpdateAttackState(float distanceToPlayer)
     {
-  
-        transform.LookAt(new Vector3(playerTransform.position.x, transform.position.y, playerTransform.position.z));
-        // Transicion de regreso a Persecucion si se aleja
+        // Rota mirando hacia el jugador sobre el eje horizontal
+        Vector3 targetLook = new Vector3(playerTransform.position.x, transform.position.y, playerTransform.position.z);
+        transform.LookAt(targetLook);
 
+        // Transición de regreso a Persecución si el jugador se aleja
         if (distanceToPlayer > attackRadius && !isAttacking)
         {
             currentState = AIState.Chase;
             return;
         }
+
         if (!isAttacking)
         {
             StartCoroutine(AttackCooldown());
         }
-
     }
 
-    IEnumerator AttackCooldown()
+    private IEnumerator AttackCooldown()
     {
         isAttacking = true;
-        agent.isStopped = true;
+        if (agent != null && agent.isOnNavMesh) agent.isStopped = true;
+
         ExecuteAttack();
+
         yield return new WaitForSeconds(attackCooldown);
+
         isAttacking = false;
-        agent.isStopped = false;
-
-
+        if (agent != null && agent.isOnNavMesh) agent.isStopped = false;
     }
 
     private void ExecuteAttack()
     {
         if (healthSystemPlayer != null)
         {
-            Debug.Log("Ataque  contra el jugador");
-            attack.Melee();
+            Debug.Log("[EnemyAI] Ataque contra el jugador");
+
+            // Dispara el trigger de la animación de puño
+            if (animator != null && !string.IsNullOrEmpty(punchTriggerName))
+            {
+                animator.SetTrigger(punchTriggerName);
+            }
+
+            // Aplica el daño mediante el componente Attack
+            if (attack != null)
+            {
+                attack.Melee();
+            }
         }
     }
 
@@ -164,9 +204,9 @@ public class EnemyAI : MonoBehaviour
         isWaitingAtPoint = true;
         yield return new WaitForSeconds(waitTimeAtPoint);
 
-        if (patrolPoints.Length > 0)
+        if (patrolPoints != null && patrolPoints.Length > 0)
         {
-            currentPatrolIndex = (currentPatrolIndex + 1) % patrolPoints.Length;//2%3
+            currentPatrolIndex = (currentPatrolIndex + 1) % patrolPoints.Length;
             GoToNextPatrolPoint();
         }
 
@@ -175,13 +215,25 @@ public class EnemyAI : MonoBehaviour
 
     private void GoToNextPatrolPoint()
     {
-        if (patrolPoints.Length == 0) return;
+        if (patrolPoints == null || patrolPoints.Length == 0 || agent == null || !agent.isOnNavMesh) return;
 
-        agent.SetDestination(patrolPoints[currentPatrolIndex].position);
+        if (patrolPoints[currentPatrolIndex] != null)
+        {
+            agent.SetDestination(patrolPoints[currentPatrolIndex].position);
+        }
     }
+
+    private void UpdateAnimationSpeed(float speed)
+    {
+        if (animator != null && !string.IsNullOrEmpty(speedFloatName))
+        {
+            animator.SetFloat(speedFloatName, speed);
+        }
+    }
+
     private void OnDrawGizmosSelected()
     {
-        // Radio de deteccion (Amarillo)
+        // Radio de detección (Amarillo)
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, detectionRadius);
 
@@ -190,9 +242,7 @@ public class EnemyAI : MonoBehaviour
         Gizmos.DrawWireSphere(transform.position, attackRadius);
     }
 
-
-
-
+    // Opcional A: Aturdimiento
     public void Stun(float duration)
     {
         StartCoroutine(StunRoutine(duration));
@@ -201,18 +251,14 @@ public class EnemyAI : MonoBehaviour
     private IEnumerator StunRoutine(float duration)
     {
         isStunned = true;
-        agent.isStopped = true;
-        Debug.Log($"Aturdido por {duration} segundos");
+        if (agent != null && agent.isOnNavMesh) agent.isStopped = true;
+        UpdateAnimationSpeed(0f);
+        Debug.Log($"<color=yellow>[EnemyAI] Aturdido por {duration} segundos</color>");
 
         yield return new WaitForSeconds(duration);
 
         isStunned = false;
-        agent.isStopped = false;
-        Debug.Log("Recuperado del aturdimiento");
+        if (agent != null && agent.isOnNavMesh) agent.isStopped = false;
+        Debug.Log("<color=green>[EnemyAI] Recuperado del aturdimiento</color>");
     }
-
-
-
-
-
 }

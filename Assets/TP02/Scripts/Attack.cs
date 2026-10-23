@@ -1,42 +1,48 @@
 using System.Collections;
 using UnityEngine;
-using UnityEngine.AI;
 
+[RequireComponent(typeof(LineRenderer))]
 public class Attack : MonoBehaviour
 {
-    [Header("Raycast Shoot Settings")]
+    [Header("Raycast Shoot Settings (Arma de Fuego)")]
     [SerializeField] private Transform gun;
-    [SerializeField] private float rayDistance;
+    [SerializeField] private float rayDistance = 50f;
     [SerializeField] private Vector3 offsetGun;
+    [SerializeField] private float shotDuration = 0.07f; // Duración visible de la bala en pantalla
 
-    [Header("Raycast Shoot Settings")]
+    [Header("Melee Settings (Cuerpo a Cuerpo)")]
     [SerializeField] private Transform sword;
-    [SerializeField] private float radius;
-    [SerializeField] private Vector3 offsetSword;
+    [SerializeField] private float radius = 2f;
+    [SerializeField] private Vector3 offsetSword = new Vector3(0, 1f, 0.5f);
 
     [Header("Attack Settings")]
-    [SerializeField] private float damage = 10f;
+    [SerializeField] private float damage = 20f;
+    [SerializeField] private float cooldownAttack = 0.5f;
 
-    [SerializeField] private float cooldownAttack;
+    [SerializeField] private bool isPlayer;
+    [SerializeField] private bool isMelee;
+
     private bool canAttack = true;
     private Vector3 origin;
     private Vector3 dir;
     private bool isCharacter;
     private RaycastHit hit;
-
-    [SerializeField] private bool isPlayer;
-    [SerializeField] private bool isMelee;
-
     private PlayerMovement pM;
+    private LineRenderer laserLine;
 
     private void Awake()
     {
         pM = GetComponent<PlayerMovement>();
+        laserLine = GetComponent<LineRenderer>();
+
+        if (laserLine != null)
+        {
+            laserLine.enabled = false;
+        }
     }
 
     private void Update()
     {
-
         if (isPlayer)
         {
             if (Input.GetKeyDown(KeyCode.Mouse0) && canAttack)
@@ -44,13 +50,11 @@ public class Attack : MonoBehaviour
                 if (isMelee)
                 {
                     Melee();
-                    
                 }
                 else
                 {
                     Shoot();
                 }
-                
             }
         }
     }
@@ -61,47 +65,71 @@ public class Attack : MonoBehaviour
         {
             if (hit.collider == null) return;
             Gizmos.color = isCharacter ? Color.green : Color.red;
-
             Gizmos.DrawLine(origin, hit.point);
         }
         else
         {
             Gizmos.color = isCharacter ? Color.green : Color.red;
-
             Gizmos.DrawWireSphere(origin, radius);
         }
-
-
     }
 
     public void Shoot()
     {
+        RaycastInfo(offsetGun, false);
 
-        RaycastInfo(offsetGun);
+        Vector3 endPosition;
 
         if (Physics.Raycast(origin, dir, out hit, rayDistance))
         {
-
+            endPosition = hit.point;
+            Debug.Log($"[Attack] Disparo impactó en: {hit.collider.name}");
             AplyDamage(hit.collider.gameObject);
-
         }
-        StartCoroutine(AttackCooldown());
+        else
+        {
+            // Si no choca con nada, la bala viaja hasta la distancia máxima
+            endPosition = origin + (dir * rayDistance);
+        }
+
+        // Dibuja el trazador visible si existe LineRenderer
+        if (laserLine != null)
+        {
+            StartCoroutine(ShotEffect(origin, endPosition));
+        }
+
+        if (isPlayer)
+        {
+            StartCoroutine(AttackCooldown());
+        }
+    }
+
+    private IEnumerator ShotEffect(Vector3 start, Vector3 end)
+    {
+        laserLine.SetPosition(0, start);
+        laserLine.SetPosition(1, end);
+        laserLine.enabled = true;
+
+        yield return new WaitForSeconds(shotDuration);
+
+        laserLine.enabled = false;
     }
 
     public void Melee()
     {
+        RaycastInfo(offsetSword, true);
 
-        RaycastInfo(offsetSword);
-        Collider[] colliders =  Physics.OverlapSphere(origin, radius);
-        if (colliders.Length > 0)//solo para visualizar el debug
+        Collider[] colliders = Physics.OverlapSphere(origin, radius);
+        if (colliders.Length > 0)
         {
             foreach (Collider col in colliders)
             {
+                if (col.gameObject == gameObject) continue;
+
                 if (col.gameObject.CompareTag("Character") || col.gameObject.CompareTag("Player"))
                 {
                     AplyDamage(col.gameObject);
                 }
-
             }
         }
         else
@@ -109,51 +137,63 @@ public class Attack : MonoBehaviour
             isCharacter = false;
         }
 
-        StartCoroutine(AttackCooldown());
+        if (isPlayer)
+        {
+            StartCoroutine(AttackCooldown());
+        }
     }
 
-    IEnumerator AttackCooldown()
+    private IEnumerator AttackCooldown()
     {
-        float currentSpeed=0f;
-        if (isPlayer)
+        canAttack = false;
+        float currentSpeed = 0f;
+
+        if (pM != null)
         {
             currentSpeed = pM.Speed;
             pM.Speed = 0f;
-            canAttack = false;
-
-            yield return new WaitForSeconds(cooldownAttack);
-
-
-            pM.Speed = currentSpeed;
-            canAttack = true;
         }
 
-        
-        
+        yield return new WaitForSeconds(cooldownAttack);
 
-
+        if (pM != null)
+        {
+            pM.Speed = currentSpeed;
+        }
+        canAttack = true;
     }
 
     private void AplyDamage(GameObject hitObj)
     {
-        if ((hitObj.CompareTag("Player") || hitObj.CompareTag("Character") ) && hitObj!=null)
-        {
-            hitObj.GetComponent<HealthSystem>().TakeDamage(damage);
+        if (hitObj == null) return;
 
-            isCharacter = true;//variable de apoyo
+        HealthSystem targetHealth = hitObj.GetComponentInParent<HealthSystem>();
+
+        if (targetHealth != null && (hitObj.CompareTag("Player") || hitObj.CompareTag("Character")))
+        {
+            targetHealth.TakeDamage(damage);
+            isCharacter = true;
         }
         else
         {
             isCharacter = false;
         }
- 
     }
 
-
-    private void RaycastInfo(Vector3 offset)
+    private void RaycastInfo(Vector3 offset, bool useSword)
     {
-        origin = sword.TransformPoint(offset);
-        dir = transform.forward;
+        if (useSword)
+        {
+            origin = (sword != null) ? sword.TransformPoint(offset) : transform.TransformPoint(offset);
+            dir = transform.forward;
+        }
+        else
+        {
+            // Origen: cañón del arma
+            origin = (gun != null) ? gun.TransformPoint(offset) : (Camera.main != null ? Camera.main.transform.position : transform.position);
+            
+            // Dirección: hacia el centro de mira de la cámara
+            dir = (Camera.main != null) ? Camera.main.transform.forward : transform.forward;
+        }
     }
-
 }

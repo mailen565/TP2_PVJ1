@@ -142,17 +142,15 @@ public class GameManager : MonoBehaviour
         ChangeState(GameState.GameOver);
     }
 
-    public void NotifyEnemyDefeat()
+   public void NotifyEnemyDefeat()
     {
         if (currentState != GameState.Playing) return;
 
-        AddScore(50);
+        AddScore(50); // Suma 50 puntos por eliminar la amenaza
         enemiesRemaining--;
 
-        if (enemiesRemaining <= 0)
-        {
-            ChangeState(GameState.Victory);
-        }
+        Debug.Log($"<color=cyan>[GameManager] Guardia neutralizado. Enemigos restantes: {enemiesRemaining}</color>");
+
     }
 
     public void NotifyGoalZone()
