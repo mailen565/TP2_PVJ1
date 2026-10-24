@@ -31,12 +31,27 @@ public class HealthSystem : MonoBehaviour
         rend = GetComponentInChildren<Renderer>();
     }
 
+    private void Start()
+    {
+        // Inicializa la barra de vida en la UI al comenzar si es el Player
+        if (gameObject.CompareTag("Player") && UIManager.Instance != null)
+        {
+            UIManager.Instance.UpdateHealth(currentHealth, maxHealth);
+        }
+    }
+
     public void TakeDamage(float amount)
     {
         if (isDead) return;
 
         currentHealth -= amount;
         currentHealth = Mathf.Clamp(currentHealth, 0f, maxHealth);
+
+        // Actualiza el slider y texto del HUD
+        if (gameObject.CompareTag("Player") && UIManager.Instance != null)
+        {
+            UIManager.Instance.UpdateHealth(currentHealth, maxHealth);
+        }
 
         Debug.Log($"[HealthSystem - {gameObject.name}] Salud actual: {currentHealth}");
 
@@ -52,6 +67,12 @@ public class HealthSystem : MonoBehaviour
 
         currentHealth += amount;
         currentHealth = Mathf.Clamp(currentHealth, 0f, maxHealth);
+
+        // Actualiza el slider y texto del HUD al curarse
+        if (gameObject.CompareTag("Player") && UIManager.Instance != null)
+        {
+            UIManager.Instance.UpdateHealth(currentHealth, maxHealth);
+        }
 
         Debug.Log($"[HealthSystem - {gameObject.name}] Salud recuperada: +{amount}. Salud actual: {currentHealth}");
     }

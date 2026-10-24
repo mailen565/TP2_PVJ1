@@ -3,7 +3,7 @@ using UnityEngine;
 
 public class PlayerMovement : MonoBehaviour
 {
-    [Header ("Movement Settings")]
+    [Header("Movement Settings")]
     [SerializeField] private float speed;
 
     public float Speed
@@ -11,25 +11,26 @@ public class PlayerMovement : MonoBehaviour
         get { return speed; }
         set { speed = value; }
     }
+
     [SerializeField] private float jumpForce;
-    [SerializeField] private bool isStop=false;
+    [SerializeField] private bool isStop = false;
     public bool IsStop
     {
-        get {return isStop; }
-        set { isStop=value; }
+        get { return isStop; }
+        set { isStop = value; }
     }
+
+    // Bandera para permitir o bloquear el salto (usada por la zona de lodo)
+    public bool canJump = true;
 
     private float moveHorizontal;
     private float moveVertical;
     private Rigidbody rb;
 
-    [Header ("Raycast Settings")]
-    [SerializeField]private bool isGrounded;
-
+    [Header("Raycast Settings")]
+    [SerializeField] private bool isGrounded;
     [SerializeField] private float rayDistance;
-
     [SerializeField] private LayerMask groundLayer;
-
 
     void Start()
     {
@@ -38,50 +39,41 @@ public class PlayerMovement : MonoBehaviour
 
     void Update()
     {
-   
-            moveHorizontal = Input.GetAxis("Horizontal");
-            moveVertical = Input.GetAxis("Vertical");
+        moveHorizontal = Input.GetAxis("Horizontal");
+        moveVertical = Input.GetAxis("Vertical");
 
-            CheckGround();
-            
-            if (Input.GetButtonDown("Jump") && isGrounded)
-            {
-                rb.linearVelocity = new Vector3(
+        CheckGround();
+        
+        // El salto solo se ejecuta si está en el suelo y no está bloqueado por el lodo
+        if (Input.GetButtonDown("Jump") && isGrounded && canJump)
+        {
+            rb.linearVelocity = new Vector3(
                 rb.linearVelocity.x, 
-                0f,
+                0f, 
                 rb.linearVelocity.z
-                );
-                rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
-                isGrounded = false;
-            }
-
+            );
+            rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
+            isGrounded = false;
+        }
     }
 
     private void FixedUpdate()
     {
         Vector3 movement = (transform.forward * moveVertical + transform.right * moveHorizontal).normalized;
         rb.linearVelocity = new Vector3(movement.x * speed, rb.linearVelocity.y, movement.z * speed);
-        /*Vector3 movement = (transform.forward * moveVertical + transform.right * moveHorizontal).normalized;
-
-        Vector3 newPosition = rb.position + (movement * speed * Time.fixedDeltaTime);
-
-        rb.MovePosition(newPosition);*/
-
     }
+
     private void CheckGround()
     {
         Vector3 origin = transform.position + Vector3.down * 0.45f;
         isGrounded = Physics.Raycast(origin, Vector3.down, rayDistance, groundLayer);
 
         Color ColorRay = isGrounded ? Color.green : Color.red;
-
-        Debug.DrawRay(origin,Vector3.down*rayDistance,ColorRay);
+        Debug.DrawRay(origin, Vector3.down * rayDistance, ColorRay);
     }
 
     public void RotateCharacter(float rotateY)
     {
         transform.rotation = Quaternion.Euler(0f, rotateY, 0f);
     }
-
-
 }

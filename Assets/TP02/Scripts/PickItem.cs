@@ -9,7 +9,7 @@ public class PickItem : MonoBehaviour
 
     void Update()
     {
-        // El Update corre a 60+ FPS y nunca pierde el toque de la tecla E
+        
         if (Input.GetKeyDown(KeyCode.E))
         {
             if (currentItem == null && itemInRange != null)
@@ -38,26 +38,32 @@ public class PickItem : MonoBehaviour
     }
 
     private void Pick(GameObject item)
-{
-    currentItem = item;
-
-    // Apaga el giro para que quede firme en la mano
-    Rotator rot = item.GetComponent<Rotator>();
-    if (rot != null) rot.enabled = false;
-
-    if (hand != null)
     {
-        item.transform.SetParent(hand);
-        item.transform.localPosition = Vector3.zero;
-        item.transform.localRotation = Quaternion.identity;
+        currentItem = item;
+
+        // Muestra el mensaje en la pantalla mediante UIManager
+        if (UIManager.Instance != null)
+        {
+            UIManager.Instance.ShowNotification("¡DATOS OBTENIDOS! Llévalos a la GoalZone", 3f);
+        }
+
+        // Apaga el giro para que quede firme en la mano
+        Rotator rot = item.GetComponent<Rotator>();
+        if (rot != null) rot.enabled = false;
+
+        if (hand != null)
+        {
+            item.transform.SetParent(hand);
+            item.transform.localPosition = Vector3.zero;
+            item.transform.localRotation = Quaternion.identity;
+        }
+
+        Rigidbody rb = item.GetComponent<Rigidbody>();
+        Collider col = item.GetComponent<Collider>();
+
+        if (rb != null) rb.isKinematic = true;
+        if (col != null) col.enabled = false;
     }
-
-    Rigidbody rb = item.GetComponent<Rigidbody>();
-    Collider col = item.GetComponent<Collider>();
-
-    if (rb != null) rb.isKinematic = true;
-    if (col != null) col.enabled = false;
-}
 
     public GameObject DropItem()
     {

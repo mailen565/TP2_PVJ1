@@ -8,7 +8,7 @@ public class Attack : MonoBehaviour
     [SerializeField] private Transform gun;
     [SerializeField] private float rayDistance = 50f;
     [SerializeField] private Vector3 offsetGun;
-    [SerializeField] private float shotDuration = 0.07f; // Duración visible de la bala en pantalla
+    [SerializeField] private float shotDuration = 0.07f;
 
     [Header("Melee Settings (Cuerpo a Cuerpo)")]
     [SerializeField] private Transform sword;
@@ -16,11 +16,15 @@ public class Attack : MonoBehaviour
     [SerializeField] private Vector3 offsetSword = new Vector3(0, 1f, 0.5f);
 
     [Header("Attack Settings")]
-    [SerializeField] private float damage = 20f;
+    [SerializeField] private float damage = 25f;
     [SerializeField] private float cooldownAttack = 0.5f;
 
     [SerializeField] private bool isPlayer;
     [SerializeField] private bool isMelee;
+
+    [Header("Mecánica Aturdir / Modo Letal")]
+    [SerializeField] private bool isLethalMode = false; // False = aturde | True = destruye
+    [SerializeField] private float stunDuration = 3f;   // Segundos de parálisis
 
     private bool canAttack = true;
     private Vector3 origin;
@@ -88,11 +92,9 @@ public class Attack : MonoBehaviour
         }
         else
         {
-            // Si no choca con nada, la bala viaja hasta la distancia máxima
             endPosition = origin + (dir * rayDistance);
         }
 
-        // Dibuja el trazador visible si existe LineRenderer
         if (laserLine != null)
         {
             StartCoroutine(ShotEffect(origin, endPosition));
@@ -167,17 +169,64 @@ public class Attack : MonoBehaviour
     {
         if (hitObj == null) return;
 
-        HealthSystem targetHealth = hitObj.GetComponentInParent<HealthSystem>();
-
-        if (targetHealth != null && (hitObj.CompareTag("Player") || hitObj.CompareTag("Character")))
+        // Ataque cuerpo a cuerpo del robot hacia el jugador
+        if (!isPlayer)
         {
-            targetHealth.TakeDamage(damage);
+            HealthSystem playerHealth = hitObj.GetComponentInParent<HealthSystem>();
+            if (playerHealth != null && hitObj.CompareTag("Player"))
+            {
+                playerHealth.TakeDamage(damage);
+                isCharacter = true;
+            }
+            return;
+        }
+
+        // Disparo del jugador hacia el enemigo
+        if (hitObj.CompareTag("Character"))
+        {
             isCharacter = true;
+            EnemyAI enemy = hitObj.GetComponentInParent<EnemyAI>();
+
+            if (isLethalMode)
+            {
+                // MODO LETAL (Power-Up recogido): causa daño y destruye
+                HealthSystem targetHealth = hitObj.GetComponentInParent<HealthSystem>();
+                if (targetHealth != null)
+                {
+                    targetHealth.TakeDamage(damage);
+                }
+            }
+            else
+            {
+                // MODO BASE (Sin Power-Up): aturde temporalmente
+                if (enemy != null)
+                {
+                    Debug.Log($"<color=yellow>[Attack] Enemigo aturdido por {stunDuration} segundos.</color>");
+                    enemy.Stun(stunDuration);
+                }
+            }
         }
         else
         {
             isCharacter = false;
         }
+    }
+
+    // Método que llama el Power-Up para activar la munición destructiva
+    public void ActivateLethalAmmo(float duration)
+    {
+        StartCoroutine(LethalAmmoRoutine(duration));
+    }
+
+    private IEnumerator LethalAmmoRoutine(float duration)
+    {
+        isLethalMode = true;
+        Debug.Log("<color=red><b>[POWER-UP] Modo Letal activado. Ahora destruyes enemigos.</b></color>");
+
+        yield return new WaitForSeconds(duration);
+
+        isLethalMode = false;
+        Debug.Log("<color=yellow>[POWER-UP] Modo Letal terminado. Volviendo a aturdimiento.</color>");
     }
 
     private void RaycastInfo(Vector3 offset, bool useSword)
@@ -189,10 +238,7 @@ public class Attack : MonoBehaviour
         }
         else
         {
-            // Origen: cañón del arma
             origin = (gun != null) ? gun.TransformPoint(offset) : (Camera.main != null ? Camera.main.transform.position : transform.position);
-            
-            // Dirección: hacia el centro de mira de la cámara
             dir = (Camera.main != null) ? Camera.main.transform.forward : transform.forward;
         }
     }

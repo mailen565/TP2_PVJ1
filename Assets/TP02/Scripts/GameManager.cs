@@ -92,29 +92,34 @@ public class GameManager : MonoBehaviour
         switch (currentState)
         {
             case GameState.Start:
-                Time.timeScale = 0f; // Mantiene el mundo congelado hasta que el jugador decida arrancar
-                Debug.Log("<color=white><b>[GameManager] ESTADO: INICIO (Start)</b> - Presiona ESPACIO o ENTER para comenzar la misión.</color>");
-                break;
-
+            
+            Time.timeScale = 0f;
+            if (UIManager.Instance != null) UIManager.Instance.ShowStartScreen();
+            break;
+            
             case GameState.Playing:
-                Time.timeScale = 1f; // Activa las físicas y el movimiento
-                Debug.Log("<color=green><b>[GameManager] ESTADO: JUGANDO (Playing)</b> - Infiltración en curso.</color>");
-                break;
-
+            Time.timeScale = 1f;
+            if (UIManager.Instance != null)
+            {
+                UIManager.Instance.ShowHUD();
+                UIManager.Instance.HidePauseScreen();
+            }
+            break;
+            
             case GameState.Paused:
-                Time.timeScale = 0f; // Pausa el tiempo
-                Debug.Log("<color=yellow><b>[GameManager] ESTADO: PAUSA (Paused)</b> - Juego detenido (Time.timeScale = 0).</color>");
-                break;
-
-            case GameState.Victory:
-                Time.timeScale = 0f;
-                Debug.Log($"<color=cyan><b>[GameManager] ESTADO: VICTORIA (Victory)</b> - Misión cumplida con éxito! Puntos obtenidos: {currentScore}</color>");
-                break;
-
+            Time.timeScale = 0f;
+            if (UIManager.Instance != null) UIManager.Instance.ShowPauseScreen();
+            break;
+            
             case GameState.GameOver:
-                Time.timeScale = 0f;
-                Debug.Log("<color=red><b>[GameManager] ESTADO: GAME OVER (GameOver)</b> - Agente neutralizado. Presiona 'R' para reiniciar.</color>");
-                break;
+            Time.timeScale = 0f;
+            if (UIManager.Instance != null) UIManager.Instance.ShowGameOver();
+            break;
+            
+            case GameState.Victory:
+            Time.timeScale = 0f;
+            if (UIManager.Instance != null) UIManager.Instance.ShowVictory();
+            break;
         }
     }
 
